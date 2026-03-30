@@ -12,7 +12,7 @@ build/
 .env*.local
 
 # IDE
-.idea/
+/.idea/
 .vscode/
 
 # AI assistants
@@ -35,3 +35,6 @@ next.user-config.*
 # Typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Default Next.js page (using app/(dashboard)/page.tsx instead)
+app/page.tsx
