@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+# Next.js
+.next/
+out/
+build/
+
+# Environment
+.env*.local
+
+# IDE
+/.idea/
+.vscode/
+
+# AI assistants
+AGENTS.md
+CLAUDE.md
+README.md
+
+# OS
+.DS_Store
+
+# v0 sandbox
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+.snowflake/
+.v0-trash/
+.vercel/
+next.user-config.*
+
+# Typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Default Next.js page (using app/(dashboard)/page.tsx instead)
+app/page.tsx
