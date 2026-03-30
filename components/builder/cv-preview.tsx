@@ -1,7 +1,7 @@
 "use client"
 
 import { CVData } from "@/lib/cv-types"
-import { Mail, Phone, MapPin, Linkedin, ExternalLink } from "lucide-react"
+import { Mail, Phone, MapPin, Link, ExternalLink } from "lucide-react"
 
 interface CVPreviewProps {
   data: CVData
@@ -60,7 +60,7 @@ export function CVPreview({ data }: CVPreviewProps) {
                   )}
                   {personalInfo.linkedin && (
                     <span className="flex items-center gap-1">
-                      <Linkedin className="h-3.5 w-3.5" />
+                      <Link className="h-3.5 w-3.5" />
                       {personalInfo.linkedin}
                     </span>
                   )}

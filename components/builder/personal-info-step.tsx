@@ -3,7 +3,7 @@
 import { PersonalInfo } from "@/lib/cv-types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { User, Mail, Phone, Linkedin, MapPin } from "lucide-react"
+import { User, Mail, Phone, Link, MapPin } from "lucide-react"
 
 interface PersonalInfoStepProps {
   data: PersonalInfo
@@ -68,7 +68,7 @@ export function PersonalInfoStep({ data, onUpdate }: PersonalInfoStepProps) {
 
         <div className="space-y-2">
           <Label htmlFor="linkedin" className="flex items-center gap-2">
-            <Linkedin className="h-4 w-4 text-muted-foreground" />
+            <Link className="h-4 w-4 text-muted-foreground" />
             LinkedIn URL
           </Label>
           <Input

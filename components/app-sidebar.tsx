@@ -117,7 +117,7 @@ export function AppSidebar() {
         </nav>
         <div className="border-t border-sidebar-border p-4">
           <p className="text-xs text-sidebar-foreground/50">
-            AI-Powered Resume Assistant
+            Resu You, Resu Me
           </p>
         </div>
       </aside>
