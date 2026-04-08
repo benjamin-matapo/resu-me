@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { CVData, initialCVData } from "@/lib/cv-types"
+import { downloadPDF } from "@/lib/pdf-export"
 import { BuilderProgress } from "@/components/builder/builder-progress"
 import { PersonalInfoStep } from "@/components/builder/personal-info-step"
 import { EducationStep } from "@/components/builder/education-step"
@@ -41,8 +42,14 @@ export default function BuilderPage() {
   }
 
   const handleDownload = (format: "pdf" | "docx") => {
-    console.log(`Downloading CV as ${format}...`)
-    alert(`CV download (${format.toUpperCase()}) would be triggered here. In production, this would generate a real file.`)
+    if (format === "pdf") {
+      const filename = cvData.personalInfo.name
+        ? `${cvData.personalInfo.name.replace(/\s+/g, "_")}_CV.pdf`
+        : "cv.pdf"
+      downloadPDF(cvData, filename)
+    } else {
+      console.log(`DOCX download would be triggered here for: ${format}`)
+    }
   }
 
   return (

@@ -10,38 +10,9 @@ import { cn } from "@/lib/utils"
 
 interface OptimiserResult {
   score: number
-  matchedKeywords: string[]
-  missingKeywords: string[]
-  originalCV: string
-  optimisedCV: string
-}
-
-function analyzeKeywords(cvText: string, jobDescription: string): OptimiserResult {
-  const jobKeywords = jobDescription
-    .toLowerCase()
-    .split(/\W+/)
-    .filter((word) => word.length > 4)
-    .filter((word, i, arr) => arr.indexOf(word) === i)
-    .slice(0, 20)
-
-  const cvLower = cvText.toLowerCase()
-  const matched = jobKeywords.filter((kw) => cvLower.includes(kw))
-  const missing = jobKeywords.filter((kw) => !cvLower.includes(kw))
-
-  const score = jobKeywords.length > 0 ? Math.round((matched.length / jobKeywords.length) * 100) : 0
-
-  let optimised = cvText
-  if (missing.length > 0) {
-    optimised += `\n\nKey Skills: ${missing.slice(0, 5).join(", ")}`
-  }
-
-  return {
-    score,
-    matchedKeywords: matched,
-    missingKeywords: missing,
-    originalCV: cvText,
-    optimisedCV: optimised,
-  }
+  matched: string[]
+  missing: string[]
+  suggestions: { keyword: string; suggestion: string; section: string }[]
 }
 
 export default function OptimiserPage() {
@@ -72,14 +43,31 @@ export default function OptimiserPage() {
     }
   }, [])
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     setFileName(file.name)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const text = e.target?.result as string
-      setCVText(text || `[Content from ${file.name}]\n\nThis is a simulated CV content for demonstration purposes.\n\nExperience:\n- Software Engineer at Tech Company\n- Developed web applications using React\n- Collaborated with cross-functional teams\n\nSkills:\n- JavaScript, TypeScript, React\n- Node.js, Python\n- Agile methodologies`)
+    setCVText("")
+
+    const formData = new FormData()
+    formData.append("file", file)
+
+    try {
+      const response = await fetch("/api/parse", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.message || "Failed to parse file")
+        return
+      }
+
+      const data = await response.json()
+      setCVText(data.text)
+    } catch (error) {
+      console.error("Parse error:", error)
+      alert("Failed to parse file. Please try again.")
     }
-    reader.readAsText(file)
   }
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,11 +80,30 @@ export default function OptimiserPage() {
     if (!cvText || !jobDescription) return
 
     setIsProcessing(true)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    setResult(null)
 
-    const analysisResult = analyzeKeywords(cvText, jobDescription)
-    setResult(analysisResult)
-    setIsProcessing(false)
+    try {
+      const response = await fetch("/api/optimise", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ cvText, jdText: jobDescription }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || "Failed to optimise CV")
+      }
+
+      const data = await response.json()
+      setResult(data)
+    } catch (error) {
+      console.error("Optimise error:", error)
+      alert(error instanceof Error ? error.message : "Failed to optimise CV. Please try again.")
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const getScoreColor = (score: number) => {
@@ -269,13 +276,13 @@ export default function OptimiserPage() {
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
                         <CheckCircle className="h-4 w-4 text-success" />
-                        Matched Keywords ({result.matchedKeywords.length})
+                        Matched Keywords ({result.matched.length})
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-2">
-                        {result.matchedKeywords.length > 0 ? (
-                          result.matchedKeywords.map((kw) => (
+                        {result.matched.length > 0 ? (
+                          result.matched.map((kw) => (
                             <Badge key={kw} className="bg-success/10 text-success hover:bg-success/20">
                               {kw}
                             </Badge>
@@ -292,13 +299,13 @@ export default function OptimiserPage() {
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
                         <XCircle className="h-4 w-4 text-destructive" />
-                        Missing Keywords ({result.missingKeywords.length})
+                        Missing Keywords ({result.missing.length})
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-2">
-                        {result.missingKeywords.length > 0 ? (
-                          result.missingKeywords.map((kw) => (
+                        {result.missing.length > 0 ? (
+                          result.missing.map((kw) => (
                             <Badge
                               key={kw}
                               variant="destructive"
@@ -316,37 +323,26 @@ export default function OptimiserPage() {
                     </CardContent>
                   </Card>
 
-                  {/* Before/After Comparison */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">CV Comparison</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <h4 className="mb-2 text-sm font-medium text-muted-foreground">
-                            Original
-                          </h4>
-                          <div className="h-40 overflow-auto rounded border border-border bg-muted/30 p-3 text-xs">
-                            {result.originalCV.slice(0, 300)}...
-                          </div>
-                        </div>
-                        <div>
-                          <h4 className="mb-2 text-sm font-medium text-success">
-                            Optimised
-                          </h4>
-                          <div className="h-40 overflow-auto rounded border border-success/30 bg-success/5 p-3 text-xs">
-                            {result.optimisedCV.slice(0, 300)}...
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Button className="w-full" size="lg">
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Optimised CV
-                  </Button>
+                  {/* Suggestions */}
+                  {result.suggestions && result.suggestions.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Suggestions</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ul className="space-y-3">
+                          {result.suggestions.map((s, i) => (
+                            <li key={i} className="flex items-start gap-3">
+                              <Badge variant="outline" className="shrink-0 mt-0.5">
+                                {s.section}
+                              </Badge>
+                              <p className="text-sm text-muted-foreground">{s.suggestion}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  )}
                 </>
               )}
             </div>

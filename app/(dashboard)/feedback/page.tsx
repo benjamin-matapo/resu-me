@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
 
 interface FeedbackIssue {
   id: string
-  category: "formatting" | "ats" | "keywords" | "content" | "clarity"
+  category: "formatting" | "ats" | "keywords" | "bullets" | "clarity"
   severity: "error" | "warning" | "info"
   title: string
   message: string
@@ -38,112 +38,11 @@ interface FeedbackResult {
   issues: FeedbackIssue[]
 }
 
-function analyzeFeedback(cvText: string, jobDescription?: string): FeedbackResult {
-  const issues: FeedbackIssue[] = []
-
-  if (cvText.length < 500) {
-    issues.push({
-      id: "1",
-      category: "content",
-      severity: "warning",
-      title: "CV may be too short",
-      message: "Your CV appears to be quite brief. Consider adding more detail.",
-      suggestion: "Expand on your achievements with specific metrics and examples.",
-    })
-  }
-
-  if (!cvText.toLowerCase().includes("experience")) {
-    issues.push({
-      id: "2",
-      category: "formatting",
-      severity: "error",
-      title: "Missing Experience section",
-      message: "Standard section headings help ATS parse your CV correctly.",
-      suggestion: 'Add a clearly labelled "Experience" or "Work Experience" section.',
-    })
-  }
-
-  if (!cvText.toLowerCase().includes("education")) {
-    issues.push({
-      id: "3",
-      category: "formatting",
-      severity: "warning",
-      title: "Missing Education section",
-      message: "Most roles expect to see educational background.",
-      suggestion: 'Add an "Education" section with your qualifications.',
-    })
-  }
-
-  if (!cvText.includes("@")) {
-    issues.push({
-      id: "4",
-      category: "ats",
-      severity: "error",
-      title: "Missing contact email",
-      message: "Recruiters need a way to contact you.",
-      suggestion: "Add a professional email address at the top of your CV.",
-    })
-  }
-
-  const weakVerbs = ["helped", "assisted", "worked on", "was responsible for"]
-  weakVerbs.forEach((verb, i) => {
-    if (cvText.toLowerCase().includes(verb)) {
-      issues.push({
-        id: `weak-${i}`,
-        category: "content",
-        severity: "info",
-        title: "Weak action verb detected",
-        message: `The phrase "${verb}" could be more impactful.`,
-        suggestion: `Replace with stronger verbs like "led", "delivered", "achieved", or "implemented".`,
-        line: `"...${verb}..."`,
-      })
-    }
-  })
-
-  if (jobDescription) {
-    const jobKeywords = jobDescription
-      .toLowerCase()
-      .split(/\W+/)
-      .filter((w) => w.length > 5)
-      .slice(0, 10)
-    const cvLower = cvText.toLowerCase()
-    const missing = jobKeywords.filter((kw) => !cvLower.includes(kw))
-
-    if (missing.length > 0) {
-      issues.push({
-        id: "keywords",
-        category: "keywords",
-        severity: "warning",
-        title: "Missing key terms from job description",
-        message: `Consider incorporating: ${missing.slice(0, 5).join(", ")}`,
-        suggestion: "Add relevant keywords naturally throughout your CV.",
-      })
-    }
-  }
-
-  const clarityScore = Math.max(40, 100 - issues.filter((i) => i.severity === "error").length * 20 - issues.filter((i) => i.severity === "warning").length * 10)
-
-  return {
-    clarityScore,
-    atsCompatibility: {
-      passed: [
-        "Standard file format",
-        "Readable font detected",
-        "No images blocking text",
-      ],
-      failed: issues.filter((i) => i.category === "ats" || i.category === "formatting").length > 0
-        ? ["Missing standard sections", "Contact information incomplete"]
-        : [],
-    },
-    issues,
-  }
-}
-
 const categoryIcons = {
   formatting: Layout,
   ats: Search,
   keywords: Target,
-  content: Lightbulb,
+  bullets: FileText,
   clarity: Gauge,
 }
 
@@ -196,14 +95,31 @@ export default function FeedbackPage() {
     }
   }, [])
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     setFileName(file.name)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const text = e.target?.result as string
-      setCVText(text || `[Content from ${file.name}]\n\nJohn Smith\njohn.smith@email.com\n\nExperience:\n- Helped with software development\n- Worked on various projects\n- Was responsible for team coordination\n\nSkills:\n- JavaScript, React\n- Communication`)
+    setCVText("")
+
+    const formData = new FormData()
+    formData.append("file", file)
+
+    try {
+      const response = await fetch("/api/parse", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.message || "Failed to parse file")
+        return
+      }
+
+      const data = await response.json()
+      setCVText(data.text)
+    } catch (error) {
+      console.error("Parse error:", error)
+      alert("Failed to parse file. Please try again.")
     }
-    reader.readAsText(file)
   }
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -216,11 +132,59 @@ export default function FeedbackPage() {
     if (!cvText) return
 
     setIsProcessing(true)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
 
-    const feedbackResult = analyzeFeedback(cvText, jobDescription || undefined)
-    setResult(feedbackResult)
-    setIsProcessing(false)
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cvText,
+          jdText: jobDescription || undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || "Failed to generate feedback")
+      }
+
+      const data = await response.json()
+
+      const passed: string[] = []
+      const failed: string[] = []
+
+      data.feedback.forEach((item: FeedbackItem) => {
+        if (item.category === "ats") {
+          failed.push(item.title)
+        }
+      })
+
+      if (failed.length === 0 && data.feedback.length < 5) {
+        passed.push("Standard file format")
+        passed.push("Readable font detected")
+        passed.push("No images blocking text")
+      }
+
+      const clarityScore = Math.max(
+        40,
+        100 -
+          data.feedback.filter((i: FeedbackItem) => i.severity === "error").length * 20 -
+          data.feedback.filter((i: FeedbackItem) => i.severity === "warning").length * 10
+      )
+
+      setResult({
+        clarityScore,
+        atsCompatibility: { passed, failed },
+        issues: data.feedback,
+      })
+    } catch (error) {
+      console.error("Feedback error:", error)
+      alert(error instanceof Error ? error.message : "Failed to generate feedback. Please try again.")
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   return (
